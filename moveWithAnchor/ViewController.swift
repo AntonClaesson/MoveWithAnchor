@@ -83,19 +83,22 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
         var planeHit : ARHitTestResult!
         
         if recognizer.state == .changed {
+            
             let hitTestPlane = self.sceneView.hitTest(touch, types: .existingPlane)
             guard hitTestPlane.first != nil else { return }
             planeHit = hitTestPlane.first!
             modelNodeHit.position = SCNVector3(planeHit.worldTransform.columns.3.x,modelNodeHit.position.y,planeHit.worldTransform.columns.3.z)
                 //print(sceneView.anchor(for: modelNodeHit)?.name)
                 //print(sceneView.anchor(for: modelNodeHit)?.transform.columns.3)
-            }else if recognizer.state == .ended || recognizer.state == .cancelled || recognizer.state == .failed{
+        
+        }else if recognizer.state == .ended || recognizer.state == .cancelled || recognizer.state == .failed{
+            
             guard let oldAnchor = sceneView.anchor(for: modelNodeHit) else { return }
             let newAnchor = ARAnchor(name: oldAnchor.name!, transform: modelNodeHit.simdTransform )
-            print(oldAnchor.transform.columns.3)
+            print(oldAnchor.transform.columns.3)        // old position
             sceneView.session.remove(anchor: oldAnchor)
             sceneView.session.add(anchor: newAnchor)
-            print(newAnchor.transform.columns.3)
+            print(newAnchor.transform.columns.3)        // updated position
 
         }
     }
@@ -106,8 +109,10 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
     
 
     // Override to create and configure nodes for anchors added to the view's session.
+    // Called whenever a new anchor is created and returns a new node associated with that specific anchor.
     func renderer(_ renderer: SCNSceneRenderer, nodeFor anchor: ARAnchor) -> SCNNode? {
-        //check anchor name - to place
+        // Execute the correct code depending on the name of the newly created anchor.
+        // Add more if statesments for new models eg. if(anchor.name == "house")...
         if(anchor.name == "box"){
             let box = SCNBox(width: 0.2, height: 0.2, length: 0.2, chamferRadius: 0)
             let material = SCNMaterial()
@@ -120,12 +125,12 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
             return boxNode
         }
         return SCNNode()
-       
     }
 
     func renderer(_ renderer: SCNSceneRenderer, didAdd node: SCNNode, for anchor: ARAnchor) {
-        guard anchor is ARPlaneAnchor else { return }
-        print("plane detected")
+        if anchor is ARPlaneAnchor {
+            print("plane detected")
+        }
     }
     
     func session(_ session: ARSession, didFailWithError error: Error) {
