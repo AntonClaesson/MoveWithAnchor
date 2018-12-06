@@ -14,15 +14,20 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
 
     @IBOutlet var sceneView: ARSCNView!
     
+    // Used for categoryBitMask values.
+    // New values should be unique powers of 2
     enum BodyType : Int {
         case ObjectModel = 2;
     }
     
+    // These are properties needed for each unique modeltype.
+    // Can probably be outsoured to an extension
     var chairNode: SCNNode!
     var chairID = "chair"
     
     var boxNode: SCNNode!
     var boxID = "box"
+    
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -57,7 +62,13 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
         sceneView.session.pause()
     }
     
+    /*
+     Defines properties of each model in order to be able to
+     clone the model whenever a new model is requested or update is required.
+    */
     private func initModels(){
+        
+        // ====== Chair model ===========
         let chairModelScene = SCNScene(named:
             "art.scnassets/chair/chair.scn")!
         chairNode =  chairModelScene.rootNode.childNode(
@@ -66,7 +77,7 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
             node.categoryBitMask = BodyType.ObjectModel.rawValue
             node.name = "chairChild"
         }
-        // =============================
+        // ======= Box model  ===========
         let box = SCNBox(width: 0.2, height: 0.2, length: 0.2, chamferRadius: 0)
         let material = SCNMaterial()
         material.diffuse.contents = UIColor.blue
@@ -74,6 +85,7 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
         boxNode = SCNNode(geometry: box)
         boxNode.categoryBitMask = BodyType.ObjectModel.rawValue
         boxNode.name = boxID
+        // ==============================
     }
     
     private func registerGestureRecognizers(){
@@ -120,23 +132,26 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
             
             guard let oldAnchor = sceneView.anchor(for: modelNodeHit) else { return }
             let newAnchor = ARAnchor(name: oldAnchor.name!, transform: modelNodeHit.simdTransform )
-            print(oldAnchor.transform.columns.3)        // old position
+            //print(oldAnchor.transform.columns.3)        // old position
             sceneView.session.remove(anchor: oldAnchor)
             sceneView.session.add(anchor: newAnchor)
-            print(newAnchor.transform.columns.3)        // updated position
-
+            //print(newAnchor.transform.columns.3)        // updated position
         }
     }
     
-    //Temporary solution working with 1 kind of advanced object and 1 kind of simple object.
-    //Adding more simple objects is easy
-    func getCollectorNode(_ nodeFound: SCNNode?) -> SCNNode? {  // TODO: Create method that can handle multiple objects with
-        if let node = nodeFound {                               // advanced node hierarchies.
-            
+    /*
+     Temporary solution working with 1 kind of advanced object and 1 kind of simple object.
+     Adding more simple objects is easy but not possible to use this method
+     with more than 1 advanced object.
+     TODO: Improve method so that it can handle multiple objects with advanced node hierarchies.
+     @param node that is part of a model
+     @return "CollectorNode", the childnode of the node that is created with each new anchor
+    */
+    func getCollectorNode(_ nodeFound: SCNNode?) -> SCNNode? {
+        if let node = nodeFound {
             if(node.name == boxID){
                 return node
             }
-
             if node.name == chairID {
                 return node
             } else if let parent = node.parent {
@@ -146,11 +161,11 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
         return nil
     }
     
-
-    // MARK: - ARSCNViewDelegate
+    // MARK: - ARSCNViewDelegate ==============================
     
-    /* Whenever a new anchor is created, a new node associated with that anchor is created.
-     *This function
+    /*
+      Whenever a new anchor is created, a new node associated with that anchor is created.
+      Configure the properties of that node here.
     */
     func renderer(_ renderer: SCNSceneRenderer, didAdd node: SCNNode, for anchor: ARAnchor) {
         if anchor is ARPlaneAnchor {
@@ -160,7 +175,7 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
             DispatchQueue.main.async {
                 switch anchor.name {
                     case self.chairID:
-                        let newChairNode = self.chairNode.clone()   //create a new instance of a chair
+                        let newChairNode = self.chairNode.clone()
                         newChairNode.position = SCNVector3Zero
                         // Add model as a child of the newly created node which is located at anchor position
                         node.addChildNode(newChairNode)
