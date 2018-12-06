@@ -18,6 +18,12 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
         case ObjectModel = 2;
     }
     
+    var chairNode: SCNNode!
+    var chairID = "chair"
+    
+    var boxNode: SCNNode!
+    var boxID = "box"
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         
@@ -30,8 +36,7 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
         sceneView.debugOptions = [.showFeaturePoints]
         
         registerGestureRecognizers()
-        
-    
+        initModels()
     }
     
     override func viewWillAppear(_ animated: Bool) {
@@ -52,6 +57,25 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
         sceneView.session.pause()
     }
     
+    private func initModels(){
+        let chairModelScene = SCNScene(named:
+            "art.scnassets/chair/chair.scn")!
+        chairNode =  chairModelScene.rootNode.childNode(
+            withName: chairID, recursively: true)
+        chairNode.enumerateChildNodes { (node, _) in
+            node.categoryBitMask = BodyType.ObjectModel.rawValue
+            node.name = "chairChild"
+        }
+        // =============================
+        let box = SCNBox(width: 0.2, height: 0.2, length: 0.2, chamferRadius: 0)
+        let material = SCNMaterial()
+        material.diffuse.contents = UIColor.blue
+        box.materials=[material]
+        boxNode = SCNNode(geometry: box)
+        boxNode.categoryBitMask = BodyType.ObjectModel.rawValue
+        boxNode.name = boxID
+    }
+    
     private func registerGestureRecognizers(){
         let tapGestureRecognizer = UITapGestureRecognizer(target: self, action: #selector(tapped))
         self.sceneView.addGestureRecognizer(tapGestureRecognizer)
@@ -67,9 +91,11 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
         let touch = recognizer.location(in: scene)
         guard let hitTestResult = scene.hitTest(touch, types: .existingPlane).first else { return }
 
-        let boxAnchor = ARAnchor(name:"box", transform: hitTestResult.worldTransform)
+        let boxAnchor = ARAnchor(name: boxID, transform: hitTestResult.worldTransform)
         self.sceneView.session.add(anchor: boxAnchor)
         
+        let chairAnchor = ARAnchor(name:chairID, transform: hitTestResult.worldTransform)
+        self.sceneView.session.add(anchor: chairAnchor)
     }
     
     
@@ -79,17 +105,16 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
         let touch = recognizer.location(in: recognizerView)
         
         let hitTestResult = self.sceneView.hitTest(touch, options: [SCNHitTestOption.categoryBitMask: BodyType.ObjectModel.rawValue])
-        guard let modelNodeHit = hitTestResult.first?.node else { return }
+        guard let collectorNode = getCollectorNode(hitTestResult.first?.node) else { return }
+        guard let modelNodeHit = collectorNode.parent else { return }
         var planeHit : ARHitTestResult!
-        
+     
         if recognizer.state == .changed {
             
             let hitTestPlane = self.sceneView.hitTest(touch, types: .existingPlane)
             guard hitTestPlane.first != nil else { return }
             planeHit = hitTestPlane.first!
             modelNodeHit.position = SCNVector3(planeHit.worldTransform.columns.3.x,modelNodeHit.position.y,planeHit.worldTransform.columns.3.z)
-                //print(sceneView.anchor(for: modelNodeHit)?.name)
-                //print(sceneView.anchor(for: modelNodeHit)?.transform.columns.3)
         
         }else if recognizer.state == .ended || recognizer.state == .cancelled || recognizer.state == .failed{
             
@@ -103,33 +128,50 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
         }
     }
     
+    //Temporary solution working with 1 kind of advanced object and 1 kind of simple object.
+    //Adding more simple objects is easy
+    func getCollectorNode(_ nodeFound: SCNNode?) -> SCNNode? {  // TODO: Create method that can handle multiple objects with
+        if let node = nodeFound {                               // advanced node hierarchies.
+            
+            if(node.name == boxID){
+                return node
+            }
+
+            if node.name == chairID {
+                return node
+            } else if let parent = node.parent {
+                return getCollectorNode(_:)(parent)
+            }
+        }
+        return nil
+    }
     
-    
+
     // MARK: - ARSCNViewDelegate
     
-
-    // Override to create and configure nodes for anchors added to the view's session.
-    // Called whenever a new anchor is created and returns a new node associated with that specific anchor.
-    func renderer(_ renderer: SCNSceneRenderer, nodeFor anchor: ARAnchor) -> SCNNode? {
-        // Execute the correct code depending on the name of the newly created anchor.
-        // Add more if statesments for new models eg. if(anchor.name == "house")...
-        if(anchor.name == "box"){
-            let box = SCNBox(width: 0.2, height: 0.2, length: 0.2, chamferRadius: 0)
-            let material = SCNMaterial()
-            material.diffuse.contents = UIColor.blue
-            box.materials=[material]
-            
-            let boxNode = SCNNode(geometry: box)
-            boxNode.categoryBitMask = BodyType.ObjectModel.rawValue
-            
-            return boxNode
-        }
-        return SCNNode()
-    }
-
+    /* Whenever a new anchor is created, a new node associated with that anchor is created.
+     *This function
+    */
     func renderer(_ renderer: SCNSceneRenderer, didAdd node: SCNNode, for anchor: ARAnchor) {
         if anchor is ARPlaneAnchor {
             print("plane detected")
+        }
+        if !anchor.isKind(of: ARPlaneAnchor.self) {
+            DispatchQueue.main.async {
+                switch anchor.name {
+                    case self.chairID:
+                        let newChairNode = self.chairNode.clone()   //create a new instance of a chair
+                        newChairNode.position = SCNVector3Zero
+                        // Add model as a child of the newly created node which is located at anchor position
+                        node.addChildNode(newChairNode)
+                    case self.boxID:
+                        let newBoxNode = self.boxNode.clone()
+                        newBoxNode.position = SCNVector3Zero
+                        node.addChildNode(newBoxNode)
+                default:
+                    break
+                }
+            }
         }
     }
     
